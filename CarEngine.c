@@ -25,15 +25,15 @@ int AutomaticChooseGear(int gear, int rpm, int pedal)
 
     if (pedal > 200)
     {
-        PEDAL_MODE_SPORT;
+        pedalMode = PEDAL_MODE_SPORT;
     }
     else if (pedal > 100)
     {
-        PEDAL_MODE_MID;
+        pedalMode = PEDAL_MODE_MID;
     }
     else
     {
-        PEDAL_MODE_SLOW;
+        pedalMode = PEDAL_MODE_SLOW;
     }
 
     int newGear = gear;
@@ -41,25 +41,11 @@ int AutomaticChooseGear(int gear, int rpm, int pedal)
     switch (pedalMode)
     {
     case PEDAL_MODE_SPORT:
-        break;
-    case PEDAL_MODE_MID:
-        break;
-    case PEDAL_MODE_SLOW:
-        break;
-    default:
-        return gear;
-    }
-
-    if (rpm > MAX_RPM - UPPER_LIMIT_THRESHOLD)
-    {
-        newGear = gear + 1;
-    }
-    else if (rpm < 1200)
-    {
-        newGear = gear - 1;
-    }
-    else if (pedal > 200)
-    {
+        if (rpm > MAX_RPM - UPPER_LIMIT_THRESHOLD)
+        {
+            newGear = gear + 1;
+            break;
+        }
         for (int i = 1; i <= gear; i++)
         {
             if (rpm + 2000 * i > MAX_RPM - UPPER_LIMIT_THRESHOLD)
@@ -68,17 +54,37 @@ int AutomaticChooseGear(int gear, int rpm, int pedal)
                 break;
             }
         }
-    }
-    else
-    {
-        if (rpm > 5000)
+        break;
+    case PEDAL_MODE_MID:
+        if (rpm > 6000)
         {
             newGear = gear + 1;
+        }
+        else if (rpm < 3000)
+        {
+            newGear = gear - 1;
         }
         else
         {
             newGear = gear;
         }
+        break;
+    case PEDAL_MODE_SLOW:
+        if (rpm > 4000)
+        {
+            newGear = gear + 1;
+        }
+        else if (rpm < 1500)
+        {
+            newGear = gear - 1;
+        }
+        else
+        {
+            newGear = gear;
+        }
+        break;
+    default:
+        return gear;
     }
 
     if (newGear > 0 && newGear <= MAX_GEARS)
@@ -128,7 +134,8 @@ void Pedal(int *pedal, Vector2 mousePos)
 
 void Transmission(int *gear, int *rpm, int pedal, bool isAutomatic, bool isStarted)
 {
-    if(!isStarted){
+    if (!isStarted)
+    {
         *rpm = 0;
         *gear = 1;
     }
@@ -213,10 +220,6 @@ void StartStopButton(bool *isStarted, int *rpm, Vector2 mousePos)
             *isStarted = !(*isStarted);
         }
     }
-    else
-    {
-        SetMouseCursor(MOUSE_CURSOR_ARROW);
-    }
 
     DrawCircle(WIDTH * 5 / 6, 100, 52, WHITE);
     DrawCircle(WIDTH * 5 / 6, 100, 50, RED);
@@ -234,11 +237,50 @@ void Gauge(int rpm)
 
     Color rpmTextColor = {255, 255 - rpm / 120, 255 - rpm / 60, 255};
 
-    DrawText(TextFormat("%d RPM", rpm), center.x - MeasureText(TextFormat("%d RPM", rpm), 50) / 2, center.y - 200, 50, rpmTextColor);
+    DrawRectangleLines(center.x - 130, center.y - 205, 50, 50, (Color){150, 150, 150, 255});
+    DrawRectangleLines(center.x - 80, center.y - 205, 50, 50, (Color){150, 150, 150, 255});
+    DrawRectangleLines(center.x - 30, center.y - 205, 50, 50, (Color){150, 150, 150, 255});
+    DrawRectangleLines(center.x + 20, center.y - 205, 50, 50, (Color){150, 150, 150, 255});
+
+    DrawText(TextFormat("%d", rpm / 1000), center.x - 118, center.y - 202, 50, rpmTextColor);
+    DrawText(TextFormat("%d", rpm / 100 % 10), center.x - 68, center.y - 202, 50, rpmTextColor);
+    DrawText(TextFormat("%d", rpm / 10 % 10), center.x - 18, center.y - 202, 50, rpmTextColor);
+    DrawText(TextFormat("%d", rpm % 10), center.x + 32, center.y - 202, 50, rpmTextColor);
+
+    DrawText(TextFormat("RPM"), center.x + 80, center.y - 190, 40, rpmTextColor);
 
     DrawCircleV(center, 5, WHITE);
     DrawCircleLinesV(center, 260, GRAY);
     DrawLineEx(center, needleEnd, 4.0f, RED);
+}
+
+void GearIndicator(bool isStarted, int gear)
+{
+
+    DrawRectangleRounded((Rectangle){WIDTH / 2 - 70, HEIGHT / 8 - 20, 140, 140}, 0.6f, 4, (Color){30, 30, 30, 255});
+
+    DrawText(isStarted ? TextFormat("%d", gear) : "P", WIDTH / 2 - MeasureText(isStarted ? TextFormat("%d", gear) : "P", 100) / 2, HEIGHT / 8 + 5, 100, RED);
+}
+
+void Spedometer(int gear, int rpm)
+{
+    float speed = (rpm / 2000.0f) * gear * 10.0f;
+    DrawText(TextFormat("%.0f km/h", speed), WIDTH / 2 - MeasureText(TextFormat("%.0f km/h", speed), 20) / 2, 10, 20, WHITE);
+}
+
+void TransmissionSwitch(bool *isAutomatic, Vector2 mousePos)
+{
+    DrawRectangleRounded((Rectangle){16, 16, 78 + 30 * !*isAutomatic, 38}, 0.4f, 4, WHITE);
+    DrawRectangleRounded((Rectangle){18, 18, 74 + 30 * !*isAutomatic, 34}, 0.4f, 4, (Color){30, 30, 30, 255});
+    DrawText(*isAutomatic ? "AUTO" : "MANUAL", 25, 25, 22, WHITE);
+    if (CheckCollisionPointRec(mousePos, (Rectangle){20, 20, 70 + 30 * !*isAutomatic, 30}))
+    {
+        SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        {
+            *isAutomatic = !*isAutomatic;
+        }
+    }
 }
 
 int main()
@@ -259,26 +301,18 @@ int main()
 
     while (!WindowShouldClose())
     {
+        SetMouseCursor(MOUSE_CURSOR_ARROW);
+
         Vector2 mousePos = GetMousePosition();
 
         BeginDrawing();
         ClearBackground((Color){20, 20, 20, 255});
 
-        DrawRectangleRounded((Rectangle){20, 20, 70 + 30 * !isAutomatic, 30}, 0.4f, 4, WHITE);
-        DrawText(isAutomatic ? "AUTO" : "MANUAL", 25, 25, 22, RED);
-        if(CheckCollisionPointRec(mousePos, (Rectangle){20, 20, 70 + 30 * !isAutomatic, 30})){
-            SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
-            if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
-                isAutomatic = !isAutomatic;
-            }
-        }
-        else{
-            SetMouseCursor(MOUSE_CURSOR_ARROW);
-        }
+        TransmissionSwitch(&isAutomatic, mousePos);
 
         StartStopButton(&isStarted, &rpm, mousePos);
 
-        DrawText(isStarted ? TextFormat("%d", gear) : "P", WIDTH / 2 - MeasureText(TextFormat("%d", gear), 100) / 2, HEIGHT / 8, 100, RED);
+        GearIndicator(isStarted, gear);
 
         Pedal(&pedal, mousePos);
 
@@ -292,6 +326,8 @@ int main()
         Exhaust(&engineSound, rpm, isStarted);
 
         Gauge(rpm);
+
+        Spedometer(gear, rpm);
 
         EndDrawing();
     }
