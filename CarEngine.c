@@ -12,15 +12,15 @@
 
 #define MAX_RPM 8000
 
-typedef enum
-{
-    PEDAL_MODE_SLOW,
-    PEDAL_MODE_MID,
-    PEDAL_MODE_SPORT
-} PedalMode;
-
 int AutomaticChooseGear(int gear, int rpm, int pedal)
 {
+    typedef enum
+    {
+        PEDAL_MODE_SLOW,
+        PEDAL_MODE_MID,
+        PEDAL_MODE_SPORT
+    } PedalMode;
+
     PedalMode pedalMode = PEDAL_MODE_SLOW;
 
     if (pedal > 200)
@@ -111,6 +111,14 @@ void Pedal(int *pedal, Vector2 mousePos)
             *pedal = 550;
         }
         *pedal -= 300;
+    }
+    else if (IsKeyDown(KEY_W))
+    {
+        *pedal += 5;
+        if (*pedal > 250)
+        {
+            *pedal = 250;
+        }
     }
     else
     {
@@ -206,7 +214,7 @@ void Exhaust(Music *engineSound, int rpm, bool isStarted)
 {
     UpdateMusicStream(*engineSound);
     float rpmNorm = (rpm - 1000) / 7000.0f;
-    SetMusicPitch(*engineSound, 1.2f + rpmNorm * 1.8f);
+    SetMusicPitch(*engineSound, 0.6f + rpmNorm * 1.4f);
     SetMusicVolume(*engineSound, isStarted ? 0.1f + rpmNorm * 0.9f : 0.0f);
 }
 
@@ -262,10 +270,10 @@ void GearIndicator(bool isStarted, int gear)
     DrawText(isStarted ? TextFormat("%d", gear) : "P", WIDTH / 2 - MeasureText(isStarted ? TextFormat("%d", gear) : "P", 100) / 2, HEIGHT / 8 + 5, 100, RED);
 }
 
-void Spedometer(int gear, int rpm)
+void Spedometer(float *speed, int rpm, int gear)
 {
-    float speed = (rpm / 2000.0f) * gear * 10.0f;
-    DrawText(TextFormat("%.0f km/h", speed), WIDTH / 2 - MeasureText(TextFormat("%.0f km/h", speed), 20) / 2, 10, 20, WHITE);
+    *speed = (rpm / 2000.0f) * gear * 10.0f;
+    DrawText(TextFormat("%.0f km/h", *speed), WIDTH / 2 - MeasureText(TextFormat("%.0f km/h", *speed), 20) / 2, 10, 20, WHITE);
 }
 
 void TransmissionSwitch(bool *isAutomatic, Vector2 mousePos)
@@ -283,6 +291,97 @@ void TransmissionSwitch(bool *isAutomatic, Vector2 mousePos)
     }
 }
 
+void ShowCar(float speed)
+{
+    typedef enum
+    {
+        BLINKER_NONE,
+        BLINKER_LEFT,
+        BLINKER_RIGHT
+    } BlinkerMode;
+
+    speed = speed * 2;
+    static float carX = 600;
+    static float carY = 550;
+    static float carRot = 270.0f;
+    static BlinkerMode blinker = BLINKER_NONE;
+    static float blinkTimer = 0.0f;
+    static bool blinkOn = false;
+
+    if (IsKeyPressed(KEY_Q))
+    {
+        if (blinker == BLINKER_LEFT)
+        {
+            blinker = BLINKER_NONE;
+        }
+        else
+        {
+            blinkTimer = 0.0f;
+            blinkOn = true;
+            blinker = BLINKER_LEFT;
+        }
+    }
+    if (IsKeyPressed(KEY_E))
+    {
+        if (blinker == BLINKER_RIGHT)
+        {
+            blinker = BLINKER_NONE;
+        }
+        else
+        {
+            blinkTimer = 0.0f;
+            blinkOn = true;
+            blinker = BLINKER_RIGHT;
+        }
+    }
+
+    blinkTimer += GetFrameTime();
+    if (blinkTimer >= 0.5f)
+    {
+        blinkTimer = 0.0f;
+        blinkOn = !blinkOn;
+    }
+
+    float rotSpeed = speed == 0 ? 0.0f : 1.0f;
+
+    if (IsKeyDown(KEY_A))
+        carRot -= rotSpeed;
+    if (IsKeyDown(KEY_D))
+        carRot += rotSpeed;
+
+    float rad = carRot * (PI / 180.0f);
+    float dirX = cosf(rad);
+    float dirY = sinf(rad);
+
+    carX += dirX * speed / 100;
+    carY += dirY * speed / 100;
+
+    DrawRectanglePro(
+        (Rectangle){carX, carY, 40, 20},
+        (Vector2){40 / 2, 20 / 2},
+        carRot,
+        (Color){0, 255, 255, 255});
+
+    if (blinkOn && blinker == BLINKER_LEFT)
+    {
+        Vector2 leftOffset = {18, -8};
+
+        float ox = leftOffset.x * cosf(rad) - leftOffset.y * sinf(rad);
+        float oy = leftOffset.x * sinf(rad) + leftOffset.y * cosf(rad);
+
+        DrawCircle(carX + ox, carY + oy, 3, YELLOW);
+    }
+    else if (blinkOn && blinker == BLINKER_RIGHT)
+    {
+        Vector2 leftOffset = {18, 8};
+
+        float ox = leftOffset.x * cosf(rad) - leftOffset.y * sinf(rad);
+        float oy = leftOffset.x * sinf(rad) + leftOffset.y * cosf(rad);
+
+        DrawCircle(carX + ox, carY + oy, 3, YELLOW);
+    }
+}
+
 int main()
 {
     SetTraceLogLevel(LOG_WARNING);
@@ -297,6 +396,7 @@ int main()
     int pedal = 0;
     int rpm = 0;
     int gear = 1;
+    float speed = 0;
     bool isAutomatic = true;
 
     while (!WindowShouldClose())
@@ -327,7 +427,9 @@ int main()
 
         Gauge(rpm);
 
-        Spedometer(gear, rpm);
+        Spedometer(&speed, rpm, gear);
+
+        ShowCar(speed);
 
         EndDrawing();
     }
