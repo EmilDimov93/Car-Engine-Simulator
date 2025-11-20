@@ -355,6 +355,10 @@ void ShowCar(float speed)
 
     carX += dirX * speed / 100;
     carY += dirY * speed / 100;
+    if(!CheckCollisionPointRec((Vector2){carX, carY}, (Rectangle){20, 20, WIDTH - 40, HEIGHT - 40})){
+        carX -= dirX * speed / 100;
+        carY -= dirY * speed / 100;
+    }
 
     DrawRectanglePro(
         (Rectangle){carX, carY, 40, 20},
